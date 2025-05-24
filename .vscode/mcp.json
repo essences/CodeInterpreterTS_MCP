@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "typescript-code-interpreter": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/Users/hayashieiichi/workspace/CodeInterpreterTS_MCP/build/index.js"]
+    }
+  }
+}
