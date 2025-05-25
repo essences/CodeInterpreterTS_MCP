@@ -6,6 +6,7 @@ import { spawn } from "child_process";
 import { writeFileSync, unlinkSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
+import * as ts from "typescript";
 // Create server instance
 const server = new McpServer({
     name: "typescript-javascript-code-interpreter",
@@ -175,6 +176,58 @@ async function executeJavaScriptCode(code) {
         };
     }
 }
+// Helper function to validate TypeScript code without execution using TypeScript Compiler API
+async function validateTypeScriptCode(code) {
+    try {
+        // Create a virtual file for TypeScript compilation
+        const filename = "temp.ts";
+        // Configure TypeScript compiler options
+        const compilerOptions = {
+            target: ts.ScriptTarget.ES2022,
+            module: ts.ModuleKind.Node16,
+            strict: true,
+            noEmit: true,
+            skipLibCheck: true
+        };
+        // Create a compiler host
+        const host = ts.createCompilerHost(compilerOptions);
+        // Override the getSourceFile method to provide our code
+        const originalGetSourceFile = host.getSourceFile;
+        host.getSourceFile = (fileName, languageVersionOrOptions, onError, shouldCreateNewSourceFile) => {
+            if (fileName === filename) {
+                return ts.createSourceFile(fileName, code, ts.ScriptTarget.ES2022, true);
+            }
+            return originalGetSourceFile.call(host, fileName, languageVersionOrOptions, onError, shouldCreateNewSourceFile);
+        };
+        // Create a program with our virtual file
+        const program = ts.createProgram([filename], compilerOptions, host);
+        // Get diagnostics
+        const diagnostics = ts.getPreEmitDiagnostics(program);
+        if (diagnostics.length === 0) {
+            return { valid: true };
+        }
+        else {
+            const errors = diagnostics.map(diagnostic => {
+                const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
+                if (diagnostic.file && diagnostic.start !== undefined) {
+                    const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+                    return `Line ${line + 1}, Column ${character + 1}: ${message}`;
+                }
+                return message;
+            });
+            return {
+                valid: false,
+                errors: errors
+            };
+        }
+    }
+    catch (error) {
+        return {
+            valid: false,
+            errors: [`型チェック中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`]
+        };
+    }
+}
 // Register TypeScript code execution tool
 server.tool("execute-typescript", "TypeScriptコードを実行します", {
     code: z.string().describe("実行するTypeScriptコード")
@@ -236,6 +289,51 @@ server.tool("execute-javascript", "JavaScriptコードを実行します", {
                 {
                     type: "text",
                     text: `実行中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`
+                }
+            ]
+        };
+    }
+});
+// Register TypeScript validation tool
+server.tool("validate-typescript", "TypeScriptコードの型チェックを行います（実行はしません）", {
+    code: z.string().describe("型チェックするTypeScriptコード")
+}, async ({ code }) => {
+    try {
+        const result = await validateTypeScriptCode(code);
+        let resultText = "";
+        if (result.valid) {
+            resultText = "✅ 型チェック結果: コードは正常です\n";
+        }
+        else {
+            resultText = "❌ 型チェック結果: エラーが見つかりました\n\n";
+            if (result.errors && result.errors.length > 0) {
+                resultText += "エラー詳細:\n";
+                result.errors.forEach((error, index) => {
+                    resultText += `${index + 1}. ${error}\n`;
+                });
+            }
+        }
+        if (result.warnings && result.warnings.length > 0) {
+            resultText += "\n警告:\n";
+            result.warnings.forEach((warning, index) => {
+                resultText += `${index + 1}. ${warning}\n`;
+            });
+        }
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: resultText
+                }
+            ]
+        };
+    }
+    catch (error) {
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: `型チェック中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`
                 }
             ]
         };

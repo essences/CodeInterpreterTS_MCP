@@ -9,9 +9,23 @@
   "scripts": {
     "build": "tsc && chmod 755 build/index.js",
     "dev": "tsx src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node build/index.js",
+    "test": "node tests/comprehensive-test.js",
+    "test:mcp": "node tests/test-mcp.mjs",
+    "test:enhanced": "node tests/test-enhanced.mjs",
+    "test:communication": "node tests/test-mcp-communication.mjs",
+    "test:all": "npm run test && npm run test:mcp && npm run test:enhanced && npm run test:communication",
+    "clean": "rm -rf build/ && rm -rf tmp/",
+    "excel:create": "node scripts/create-excel-test.cjs",
+    "excel:read": "node scripts/read-excel-test.cjs",
+    "lint": "echo 'No linting configured'",
+    "prepublishOnly": "npm run build"
   },
-  "keywords": ["mcp", "typescript", "code-interpreter"],
+  "keywords": [
+    "mcp",
+    "typescript",
+    "code-interpreter"
+  ],
   "author": "",
   "license": "ISC",
   "description": "TypeScript Code Interpreter MCP Server",
@@ -25,6 +39,7 @@
     "@modelcontextprotocol/sdk": "^1.12.0",
     "@types/node": "^22.15.21",
     "tsx": "^4.19.4",
+    "xlsx": "^0.18.5",
     "zod": "^3.25.28"
   }
 }
