@@ -1,7 +1,0 @@
-{"products": [
-  {"name": "商品A", "price": 1200, "quantity": 5},
-  {"name": "商品B", "price": 800, "quantity": 3},
-  {"name": "商品C", "price": 1500, "quantity": 2},
-  {"name": "商品D", "price": 600, "quantity": 8},
-  {"name": "商品E", "price": 2000, "quantity": 1}
-]}

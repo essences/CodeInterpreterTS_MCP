@@ -48,7 +48,7 @@ CodeInterpreterTS_MCP/
 ├── tests/                 # テストファイル
 │   ├── test-*.mjs         # 統合テスト
 │   ├── test-*.ts          # TypeScript型テスト
-│   └── comprehensive-test.js
+│   └── comprehensive-test.js # 総合テストスイート
 ├── examples/              # サンプルデータ
 │   ├── sample-numbers.txt # 数値データサンプル
 │   ├── sample-data.json   # JSONデータサンプル
@@ -59,9 +59,13 @@ CodeInterpreterTS_MCP/
 ├── scripts/               # ユーティリティスクリプト
 │   ├── create-excel-test.cjs # Excel作成スクリプト
 │   └── read-excel-test.cjs   # Excel読み取りスクリプト
+├── config/                # 設定ファイル
+│   └── claude_desktop_config.json # Claude Desktop設定
 ├── docs/                  # ドキュメント
 │   ├── IMPLEMENTATION_COMPLETE.md
 │   └── LARGE_FILE_TEST_RESULTS.md
+├── package.json           # Node.js依存関係
+├── tsconfig.json          # TypeScript設定
 └── README.md              # このファイル
 ```
 
@@ -135,6 +139,8 @@ npm run build
 ```
 
 **重要**: `/Users/yourpath/`を実際のプロジェクトパスに変更してください。
+
+**参考**: `config/claude_desktop_config.json`にサンプル設定ファイルがあります。
 
 ### 4. Claude for Desktopの再起動
 設定を変更後、Claude for Desktopを完全に再起動してください。
@@ -438,16 +444,16 @@ console.log('Excel統計結果:', statistics);
 npm test
 
 # または個別のテストファイルを実行
-node test-mcp.mjs              # 基本動作確認
-node test-enhanced.mjs         # TypeScript + JavaScript機能テスト
-node test-mcp-communication.mjs # MCPプロトコル通信テスト
+node tests/test-mcp.mjs              # 基本動作確認
+node tests/test-enhanced.mjs         # TypeScript + JavaScript機能テスト
+node tests/test-mcp-communication.mjs # MCPプロトコル通信テスト
 ```
 
 ### テストファイル
-- `test-code.ts` - TypeScript実行テスト用サンプルコード
-- `test-javascript.js` - JavaScript実行テスト用サンプルコード  
-- `test-error-code.ts` - 型エラーテスト用サンプルコード
-- `comprehensive-test.js` - 総合的なテストスイート
+- `tests/test-code.ts` - TypeScript実行テスト用サンプルコード
+- `tests/test-javascript.js` - JavaScript実行テスト用サンプルコード  
+- `tests/test-error-code.ts` - 型エラーテスト用サンプルコード
+- `tests/comprehensive-test.js` - 総合的なテストスイート
 
 ## パフォーマンス
 
