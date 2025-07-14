@@ -465,7 +465,7 @@ node tests/test-mcp-communication.mjs # MCPプロトコル通信テスト
 
 ## ライセンス
 
-ISC
+MIT
 
 ## 貢献
 
