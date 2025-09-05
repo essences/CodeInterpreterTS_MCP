@@ -1,180 +1,76 @@
 #!/usr/bin/env node
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
-import { spawn } from "child_process";
-import { writeFileSync, unlinkSync, mkdirSync, existsSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
-import * as ts from "typescript";
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+const mcp_js_1 = require("@modelcontextprotocol/sdk/server/mcp.js");
+const stdio_js_1 = require("@modelcontextprotocol/sdk/server/stdio.js");
+const zod_1 = require("zod");
+const ts = __importStar(require("typescript"));
+const execution_manager_1 = require("./execution-manager");
+const logger_1 = require("./logger");
+// Initialize logger
+const logger = logger_1.Logger.getInstance();
+logger.setLogLevel(logger_1.LogLevel.INFO);
+// Server configuration
+const serverConfig = {
+    maxConcurrentExecutions: 3,
+    executionTimeout: 30000, // 30 seconds
+    tempDirPrefix: 'mcp-code-interpreter',
+    security: {
+        enableSandbox: true,
+        allowedModules: ['console', 'Math', 'Date', 'JSON', 'Array', 'Object', 'String', 'Number'],
+        maxCodeLength: 50000 // 50KB max
+    }
+};
+// Create execution manager
+const executionManager = new execution_manager_1.ExecutionManager(serverConfig);
 // Create server instance
-const server = new McpServer({
+const server = new mcp_js_1.McpServer({
     name: "typescript-javascript-code-interpreter",
-    version: "1.1.0",
+    version: "2.0.0",
     capabilities: {
         resources: {},
         tools: {},
     },
 });
-// Helper function to create temporary TypeScript file and execute it
-async function executeTypeScriptCode(code) {
-    const tempDir = join(tmpdir(), "ts-code-interpreter");
-    const tempFile = join(tempDir, `temp_${Date.now()}.ts`);
-    try {
-        // Ensure temp directory exists
-        if (!existsSync(tempDir)) {
-            mkdirSync(tempDir, { recursive: true });
-        }
-        // Write TypeScript code to temporary file
-        writeFileSync(tempFile, code);
-        // Execute TypeScript code using tsx
-        return new Promise((resolve) => {
-            const child = spawn("npx", ["tsx", tempFile], {
-                stdio: ["pipe", "pipe", "pipe"],
-                shell: true,
-                cwd: process.cwd()
-            });
-            let stdout = "";
-            let stderr = "";
-            child.stdout?.on("data", (data) => {
-                stdout += data.toString();
-            });
-            child.stderr?.on("data", (data) => {
-                stderr += data.toString();
-            });
-            child.on("close", (code) => {
-                // Clean up temporary file
-                try {
-                    unlinkSync(tempFile);
-                }
-                catch (cleanupError) {
-                    console.error("Failed to cleanup temp file:", cleanupError);
-                }
-                if (code === 0) {
-                    resolve({ output: stdout || "コードが正常に実行されました（出力なし）" });
-                }
-                else {
-                    resolve({
-                        output: stdout || "",
-                        error: stderr || `プロセスが終了コード ${code} で終了しました`
-                    });
-                }
-            });
-            child.on("error", (error) => {
-                // Clean up temporary file
-                try {
-                    unlinkSync(tempFile);
-                }
-                catch (cleanupError) {
-                    console.error("Failed to cleanup temp file:", cleanupError);
-                }
-                resolve({
-                    output: "",
-                    error: `実行エラー: ${error.message}`
-                });
-            });
-            // Set timeout for execution (30 seconds)
-            setTimeout(() => {
-                child.kill();
-                try {
-                    unlinkSync(tempFile);
-                }
-                catch (cleanupError) {
-                    console.error("Failed to cleanup temp file:", cleanupError);
-                }
-                resolve({
-                    output: "",
-                    error: "実行がタイムアウトしました（30秒）"
-                });
-            }, 30000);
-        });
+// Helper function for consistent error messages
+function getErrorMessage(error) {
+    if (error instanceof Error) {
+        return error.message;
     }
-    catch (error) {
-        return {
-            output: "",
-            error: `ファイル作成エラー: ${error instanceof Error ? error.message : String(error)}`
-        };
-    }
-}
-// Helper function to create temporary JavaScript file and execute it
-async function executeJavaScriptCode(code) {
-    const tempDir = join(tmpdir(), "js-code-interpreter");
-    const tempFile = join(tempDir, `temp_${Date.now()}.js`);
-    try {
-        // Ensure temp directory exists
-        if (!existsSync(tempDir)) {
-            mkdirSync(tempDir, { recursive: true });
-        }
-        // Write JavaScript code to temporary file
-        writeFileSync(tempFile, code);
-        // Execute JavaScript code using Node.js
-        return new Promise((resolve) => {
-            const child = spawn("node", [tempFile], {
-                stdio: ["pipe", "pipe", "pipe"],
-                shell: true,
-                cwd: process.cwd()
-            });
-            let stdout = "";
-            let stderr = "";
-            child.stdout?.on("data", (data) => {
-                stdout += data.toString();
-            });
-            child.stderr?.on("data", (data) => {
-                stderr += data.toString();
-            });
-            child.on("close", (code) => {
-                // Clean up temporary file
-                try {
-                    unlinkSync(tempFile);
-                }
-                catch (cleanupError) {
-                    console.error("Failed to cleanup temp file:", cleanupError);
-                }
-                if (code === 0) {
-                    resolve({ output: stdout || "コードが正常に実行されました（出力なし）" });
-                }
-                else {
-                    resolve({
-                        output: stdout || "",
-                        error: stderr || `プロセスが終了コード ${code} で終了しました`
-                    });
-                }
-            });
-            child.on("error", (error) => {
-                // Clean up temporary file
-                try {
-                    unlinkSync(tempFile);
-                }
-                catch (cleanupError) {
-                    console.error("Failed to cleanup temp file:", cleanupError);
-                }
-                resolve({
-                    output: "",
-                    error: `実行エラー: ${error.message}`
-                });
-            });
-            // Set timeout for execution (30 seconds)
-            setTimeout(() => {
-                child.kill();
-                try {
-                    unlinkSync(tempFile);
-                }
-                catch (cleanupError) {
-                    console.error("Failed to cleanup temp file:", cleanupError);
-                }
-                resolve({
-                    output: "",
-                    error: "実行がタイムアウトしました（30秒）"
-                });
-            }, 30000);
-        });
-    }
-    catch (error) {
-        return {
-            output: "",
-            error: `ファイル作成エラー: ${error instanceof Error ? error.message : String(error)}`
-        };
-    }
+    return String(error);
 }
 // Helper function to validate TypeScript code without execution using TypeScript Compiler API
 async function validateTypeScriptCode(code) {
@@ -224,97 +120,110 @@ async function validateTypeScriptCode(code) {
     catch (error) {
         return {
             valid: false,
-            errors: [`型チェック中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`]
+            errors: [`TypeScript validation error: ${getErrorMessage(error)}`]
         };
     }
 }
 // Register TypeScript code execution tool
-server.tool("execute-typescript", "TypeScriptコードを実行します", {
-    code: z.string().describe("実行するTypeScriptコード")
+server.tool("execute-typescript", "Execute TypeScript code with security validation", {
+    code: zod_1.z.string().describe("TypeScript code to execute")
 }, async ({ code }) => {
     try {
-        const result = await executeTypeScriptCode(code);
+        logger.info('TypeScript execution requested', { operation: 'execute-typescript' });
+        const result = await executionManager.executeCode(code, 'typescript');
         let resultText = "";
         if (result.output) {
-            resultText += `出力:\n${result.output}\n`;
+            resultText += `Output:\n${result.output}\n`;
         }
         if (result.error) {
-            resultText += `エラー:\n${result.error}\n`;
+            resultText += `Error:\n${result.error}\n`;
         }
+        resultText += `\nExecution time: ${result.executionTime}ms`;
         return {
             content: [
                 {
                     type: "text",
-                    text: resultText || "実行完了（出力なし）"
+                    text: resultText || "Execution completed (no output)"
                 }
             ]
         };
     }
     catch (error) {
+        logger.error('TypeScript execution failed', {
+            operation: 'execute-typescript',
+            error: getErrorMessage(error)
+        });
         return {
             content: [
                 {
                     type: "text",
-                    text: `実行中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`
+                    text: `Execution failed: ${getErrorMessage(error)}`
                 }
             ]
         };
     }
 });
 // Register JavaScript code execution tool
-server.tool("execute-javascript", "JavaScriptコードを実行します", {
-    code: z.string().describe("実行するJavaScriptコード")
+server.tool("execute-javascript", "Execute JavaScript code with security validation", {
+    code: zod_1.z.string().describe("JavaScript code to execute")
 }, async ({ code }) => {
     try {
-        const result = await executeJavaScriptCode(code);
+        logger.info('JavaScript execution requested', { operation: 'execute-javascript' });
+        const result = await executionManager.executeCode(code, 'javascript');
         let resultText = "";
         if (result.output) {
-            resultText += `出力:\n${result.output}\n`;
+            resultText += `Output:\n${result.output}\n`;
         }
         if (result.error) {
-            resultText += `エラー:\n${result.error}\n`;
+            resultText += `Error:\n${result.error}\n`;
         }
+        resultText += `\nExecution time: ${result.executionTime}ms`;
         return {
             content: [
                 {
                     type: "text",
-                    text: resultText || "実行完了（出力なし）"
+                    text: resultText || "Execution completed (no output)"
                 }
             ]
         };
     }
     catch (error) {
+        logger.error('JavaScript execution failed', {
+            operation: 'execute-javascript',
+            error: getErrorMessage(error)
+        });
         return {
             content: [
                 {
                     type: "text",
-                    text: `実行中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`
+                    text: `Execution failed: ${getErrorMessage(error)}`
                 }
             ]
         };
     }
 });
 // Register TypeScript validation tool
-server.tool("validate-typescript", "TypeScriptコードの型チェックを行います（実行はしません）", {
-    code: z.string().describe("型チェックするTypeScriptコード")
+server.tool("validate-typescript", "Validate TypeScript code without execution", {
+    code: zod_1.z.string().describe("TypeScript code to validate")
 }, async ({ code }) => {
     try {
+        logger.info('TypeScript validation requested', { operation: 'validate-typescript' });
         const result = await validateTypeScriptCode(code);
         let resultText = "";
         if (result.valid) {
-            resultText = "✅ 型チェック結果: コードは正常です\n";
+            resultText = "✅ TypeScript validation: Code is valid\n";
         }
         else {
-            resultText = "❌ 型チェック結果: エラーが見つかりました\n\n";
+            resultText = "❌ TypeScript validation: Errors found\n\n";
             if (result.errors && result.errors.length > 0) {
-                resultText += "エラー詳細:\n";
+                resultText += "Error details:\n";
                 result.errors.forEach((error, index) => {
                     resultText += `${index + 1}. ${error}\n`;
                 });
             }
         }
         if (result.warnings && result.warnings.length > 0) {
-            resultText += "\n警告:\n";
+            resultText += "\nWarnings:\n";
             result.warnings.forEach((warning, index) => {
                 resultText += `${index + 1}. ${warning}\n`;
             });
@@ -329,22 +238,56 @@ server.tool("validate-typescript", "TypeScriptコードの型チェックを行�
         };
     }
     catch (error) {
+        logger.error('TypeScript validation failed', {
+            operation: 'validate-typescript',
+            error: getErrorMessage(error)
+        });
         return {
             content: [
                 {
                     type: "text",
-                    text: `型チェック中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`
+                    text: `Validation failed: ${getErrorMessage(error)}`
                 }
             ]
         };
     }
 });
+// Add server status tool
+server.tool("server-status", "Get server status and active execution count", {}, async () => {
+    const activeCount = executionManager.getActiveExecutionCount();
+    const maxConcurrent = serverConfig.maxConcurrentExecutions;
+    return {
+        content: [
+            {
+                type: "text",
+                text: `Server Status:\n- Active executions: ${activeCount}/${maxConcurrent}\n- Security sandbox: ${serverConfig.security.enableSandbox ? 'enabled' : 'disabled'}\n- Execution timeout: ${serverConfig.executionTimeout}ms\n- Max code length: ${serverConfig.security.maxCodeLength} characters`
+            }
+        ]
+    };
+});
+// Graceful shutdown handling
+process.on('SIGINT', async () => {
+    logger.info('Received SIGINT, shutting down gracefully...');
+    await executionManager.shutdown();
+    process.exit(0);
+});
+process.on('SIGTERM', async () => {
+    logger.info('Received SIGTERM, shutting down gracefully...');
+    await executionManager.shutdown();
+    process.exit(0);
+});
 async function main() {
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
-    console.error("TypeScript & JavaScript Code Interpreter MCP Server running on stdio");
+    try {
+        const transport = new stdio_js_1.StdioServerTransport();
+        await server.connect(transport);
+        logger.info("TypeScript & JavaScript Code Interpreter MCP Server v2.0 running on stdio");
+    }
+    catch (error) {
+        logger.error('Failed to start server', { error: getErrorMessage(error) });
+        process.exit(1);
+    }
 }
 main().catch((error) => {
-    console.error("Fatal error in main():", error);
+    logger.error("Fatal error in main()", { error: getErrorMessage(error) });
     process.exit(1);
 });

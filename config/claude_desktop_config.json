@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "typescript-code-interpreter": {
+      "command": "node",
+      "args": [
+        "/Users/hayashieiichi/workspace/CodeInterpreterMCP/CodeInterpreterTS_MCP/build/index.js"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
